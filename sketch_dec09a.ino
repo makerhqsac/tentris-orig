@@ -1,14 +1,11 @@
 #include <SPI.h>
-#include <SD.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_ST7735.h>
+#include <EEPROM.h>
+#include <Adafruit_NeoPixel.h>
 
 #include "config.h"
 #include "shapes.h"
 #include "melody.h"
-
-Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
-
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(BOARD_WIDTH * BOARD_HEIGHT, NEO_PIN, NEO_GRB + NEO_KHZ800);
 bool saveScores = true;
 byte currentShape = 0;
 byte currentRotation = 0;
@@ -27,17 +24,8 @@ unsigned int score = 0;
 unsigned long stamp = 0;
 unsigned long lastDown = 0;
 
-uint16_t grid[BOARD_WIDTH][BOARD_HEIGHT];
-uint16_t shapeColors[SHAPE_COUNT];
-
-uint16_t getCurrentShapeColor() {
-  return shapeColors[currentShape];
-}
-
-void fillBlock(byte x, byte y, uint16_t color) {
-  grid[x][y] = color;
-  tft.fillRect(1 + BOARD_OFFSET_X + (x * BLOCK_SIZE), 1 + BOARD_OFFSET_Y + (y * BLOCK_SIZE), BLOCK_SIZE - 1, BLOCK_SIZE - 1, color);
-}
+COLOR grid[BOARD_WIDTH][BOARD_HEIGHT];
+COLOR shapeColors[SHAPE_COUNT];
 
 bool hittingBottom() {
   for (int i = 3; i != 0; i--) {
@@ -50,11 +38,14 @@ bool hittingBottom() {
 }
 
 void drawNextShape() {
-  tft.fillRect(NEXTSHAPE_X, NEXTSHAPE_Y, 30, 30, COLOR_BLACK);
+  Serial.print("Next shape: ");
+  Serial.println(shapeNames[nextShapeIndex]);
+  return;
+  //tft.fillRect(NEXTSHAPE_X, NEXTSHAPE_Y, 30, 30, BACKGROUND_COLOR);
   for (byte i = 0; i < 4; i++) {
     for (short j = 3, x = 0; j != -1; j--, x++) {
       if (bitRead(shapes[nextShapeIndex][0][i], j) == 1) {
-        tft.fillRect(NEXTSHAPE_X + (x * BLOCK_SIZE), NEXTSHAPE_Y + (i * BLOCK_SIZE), BLOCK_SIZE - 1, BLOCK_SIZE - 1, shapeColors[nextShapeIndex]);
+        //tft.fillRect(NEXTSHAPE_X + (x * BLOCK_SIZE), NEXTSHAPE_Y + (i * BLOCK_SIZE), BLOCK_SIZE - 1, BLOCK_SIZE - 1, shapeColors[nextShapeIndex]);
       }
     }
   }
@@ -69,14 +60,9 @@ void nextShape() {
   drawNextShape();
 }
 
-
-void redrawScore() {
-  tft.fillRect(SCORE_X, SCORE_Y + 10, 40, 10, COLOR_BLACK);
-  tft.setCursor(SCORE_X, SCORE_Y + 10);
-  tft.print(score);
-}
-
 void waitForClick() {
+
+#ifdef JOY_BTN
   while (true) {
     while (digitalRead(JOY_BTN) != LOW) {
       delay(100);
@@ -87,6 +73,18 @@ void waitForClick() {
       return;
     }
   }
+#else
+  while (true) {
+    while (digitalRead(BUTTON_ROTATE) != LOW) {
+      delay(100);
+    }
+
+    delay(50);
+    if (digitalRead(BUTTON_ROTATE) == LOW) {
+      return;
+    }
+  }
+#endif
 }
 
 void saveScore() {
@@ -94,33 +92,55 @@ void saveScore() {
     return;
   }
 
-  File f = SD.open(FILE_NAME, FILE_WRITE);
-  if (f) {
-    f.println(score);
-    f.close();
-    Serial.println("Saved score.");
-  }
+  // TODO: Do something
 }
 
 void gameOver() {
-  tft.setCursor(GAMEOVER_X, GAMEOVER_Y);
-  tft.print("GAME");
-  tft.setCursor(GAMEOVER_X, GAMEOVER_Y + 10);
-  tft.print("OVER");
-
   saveScore();
+  Serial.println("Game over man! Game over!!");
   waitForClick();
 
-  tft.fillRect(90, 20, 25, 20, COLOR_BLACK);
   for (byte i = 0; i < BOARD_WIDTH; i++) {
     for (byte j = 0; j < BOARD_HEIGHT; j++) {
-      fillBlock(i, j, COLOR_BLACK);
+      fillBlock(i, j, BACKGROUND_COLOR);
     }
   }
 
   score = 0;
-  redrawScore();
   nextShape();
+  strip.show();
+}
+
+void fillBlock(byte x, byte y, COLOR color) {
+  grid[x][y] = color;
+  strip.setPixelColor(BOARD_WIDTH * (BOARD_HEIGHT - y - 1) + x, color.R, color.G, color.B);
+}
+
+COLOR getCurrentShapeColor() {
+  return shapeColors[currentShape];
+}
+
+void gravity(bool apply) {
+  static byte lastXoffset = 0;
+
+  for (byte k = 0; k < 2; k++) {
+    for (byte i = 0; i < 4; i++) {
+      for (short j = 3, x = 0; j != -1; j--, x++) {
+        if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
+          fillBlock((k == 0 ? lastXoffset : xOffset) + x, yOffset + i, k == 0 ? BACKGROUND_COLOR : shapeColors[currentShape]);
+        }
+      }
+    }
+
+    if (k == 0 && apply) {
+      yOffset++;
+    }
+  }
+
+  if (xOffset != lastXoffset) {
+    lastXoffset = xOffset;
+  }
+  strip.show();
 }
 
 bool isShapeColliding() {
@@ -140,11 +160,12 @@ bool isShapeColliding() {
     byte x = 0;
     for (short j = 3; j != -1; j--) {
       if (bitRead(p[i], j) == 1) {
-        if (grid[xOffset + x][max(0, yOffset + i + 1)] != COLOR_BLACK) {
+        if (grid[xOffset + x][max(0, yOffset + i + 1)] != BACKGROUND_COLOR) {
           if (yOffset < -1) {
             gameOver();
           }
 
+          Serial.println("Shape collided");
           return true;
         }
       }
@@ -173,7 +194,7 @@ void checkForTetris() {
     }
 
     for (byte col = 0; col < BOARD_WIDTH; col++) {
-      if (grid[col][row] == COLOR_BLACK) {
+      if (grid[col][row] == BACKGROUND_COLOR) {
         break;
       }
 
@@ -183,7 +204,7 @@ void checkForTetris() {
         foundScore = true;
 
         for (byte i = 0; i < BOARD_WIDTH; i++) {
-          fillBlock(i, row, COLOR_BLACK);
+          fillBlock(i, row, BACKGROUND_COLOR);
         }
 
         for (byte r = row; r > 1; r--) {
@@ -192,46 +213,11 @@ void checkForTetris() {
             fillBlock(c, r, grid[c][r]);
           }
         }
-
       }
     }
   }
 
-  if (foundScore) {
-    redrawScore();
-  }
-}
-
-void gravity(bool apply) {
-  static byte lastXoffset = 0;
-
-  for (byte k = 0; k < 2; k++) {
-    for (byte i = 0; i < 4; i++) {
-      for (short j = 3, x = 0; j != -1; j--, x++) {
-        if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
-          fillBlock((k == 0 ? lastXoffset : xOffset) + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
-        }
-      }
-    }
-
-    if (k == 0 && apply) {
-      yOffset++;
-    }
-  }
-
-  if (xOffset != lastXoffset) {
-    lastXoffset = xOffset;
-  }
-}
-
-void drawGrid() {
-  for (int i = 0; i < BOARD_HEIGHT + 1; i++) {
-    tft.drawFastHLine(BOARD_OFFSET_X, BOARD_OFFSET_Y + (i * BLOCK_SIZE), (BLOCK_SIZE * BOARD_WIDTH), BOARD_COLOR);
-  }
-
-  for (int i = 0; i < BOARD_WIDTH + 1; i++) {
-    tft.drawFastVLine(BOARD_OFFSET_X + (i * BLOCK_SIZE), BOARD_OFFSET_Y, (BLOCK_SIZE * BOARD_HEIGHT), BOARD_COLOR);
-  }
+  strip.show();
 }
 
 byte getShapeWidth() {
@@ -277,7 +263,7 @@ bool canMove(bool left) {
   for (byte i = 0; i < 4; i++) {
     for (short j = 3, x = 0; j != -1; j--, x++) {
       if ((yOffset + i) >= 0) {
-        if ((bitRead(predictedShapePositions[i], j) == 1) && (grid[xOffset + x + (left ? -1 : 1)][yOffset + i] != COLOR_BLACK)) {
+        if ((bitRead(predictedShapePositions[i], j) == 1) && (grid[xOffset + x + (left ? -1 : 1)][yOffset + i] != BACKGROUND_COLOR)) {
           return false;
         }
       }
@@ -303,7 +289,7 @@ bool canRotate() {
           }
 
 
-          if (grid[xOffset + x][yOffset + i] != COLOR_BLACK) {
+          if (grid[xOffset + x][yOffset + i] != BACKGROUND_COLOR) {
             if (bitRead(shapes[currentShape][currentRotation][i], j) != 1) {
               return false;
             }
@@ -329,23 +315,24 @@ void rotate() {
     for (byte i = 0; i < 4; i++) {
       for (short j = 3, x = 0; j != -1; j--, x++) {
         if (bitRead(shapes[currentShape][currentRotation][i], j) == 1) {
-          fillBlock(xOffset + x, yOffset + i, k == 0 ? COLOR_BLACK : getCurrentShapeColor());
+          fillBlock(xOffset + x, yOffset + i, k == 0 ? BACKGROUND_COLOR : getCurrentShapeColor());
         }
       }
     }
 
+    strip.show();
     currentRotation = getNextRotation();
   }
 }
 
 void joystickMovement() {
-  int joyX = analogRead(JOY_X);
-  int joyY = analogRead(JOY_Y);
   unsigned long now = millis();
-
+  static bool hasClicked = false;
   static unsigned long lastMove = now;
   static short lastYoffset = yOffset;
-  static bool hasClicked = false;
+#ifdef USE_ANALOG_JOY  
+  int joyX = analogRead(JOY_X);
+  int joyY = analogRead(JOY_Y);
 
   // left
   if (joyX < 490 && xOffset > 0 && (now - lastMove) > (MOVE_DELAY + (joyX < 10 ? 0 : MOVE_DELAY * 5))) {
@@ -373,34 +360,63 @@ void joystickMovement() {
     stamp -= level;
     lastDown = now;
   }
-
+#else
   // click
-  bool isClicked = (digitalRead(JOY_BTN) == LOW);
-  if (isClicked) {
-    delay(50);
-    isClicked = (digitalRead(JOY_BTN) == LOW);
+  bool leftPressed = debounceButton(BUTTON_LEFT);
+  bool rightPressed = debounceButton(BUTTON_RIGHT);
+  bool downPressed = debounceButton(BUTTON_DOWN);
+  bool rotatePressed = debounceButton(BUTTON_ROTATE);
+
+  // Handle buttons
+  // TODO: Is this backward?? Copied from above
+  if ((now - lastMove) > MOVE_DELAY){
+    // Left
+    if (leftPressed && canMove(true)) {
+      lastMove = now;
+      xOffset--; 
+    }
+
+    // Right
+    if (rightPressed && canMove(false)) {
+      lastMove = now;
+      xOffset++; 
+    }
   }
 
-  hasClicked = hasClicked && isClicked;
-  if (!hasClicked && isClicked) {
+  if (lastDown - now > DOWN_DELAY && downPressed) {
+    stamp -= level;
+    lastDown = now;
+  }
+  
+#endif
+
+
+  hasClicked = hasClicked && rotatePressed;
+  if (!hasClicked && rotatePressed) {
     hasClicked = true;
     rotate();
   }
 }
 
-void centerWrite(String text, byte yPos, uint16_t color) {
-  tft.setCursor((tft.width() / 2) - (text.length() * 3), yPos);
-  tft.setTextColor(color);
-  tft.print(text);
+bool debounceButton(int pin) {
+  bool isClicked = (digitalRead(pin) == LOW);
+  if (isClicked) {
+    delay(50);
+    isClicked = (digitalRead(pin) == LOW);
+  }
+
+  return isClicked;
 }
 
 void setup() {
-  tft.initR(INITR_BLACKTAB);
-  tft.fillScreen(COLOR_BLACK);
 
+  strip.begin();
+  strip.show(); // Initialize all pixels to 'off'
   Serial.begin(9600);
   while (!Serial);
+  Serial.println("Setup start");
 
+#ifdef USE_SD
   if (!SD.begin(SD_CS)) {
     Serial.println("SD init failed!");
     return;
@@ -417,12 +433,24 @@ void setup() {
     Serial.println(FILE_NAME);
     saveScores = false;
   }
+#endif
 
-  pinMode(JOY_BTN, INPUT_PULLUP);
+#ifdef USE_ANALOG_JOY  
   pinMode(JOY_X, INPUT);
   pinMode(JOY_Y, INPUT);
+  pinMode(JOY_BTN, INPUT_PULLUP);
+#else
+  pinMode(BUTTON_LEFT, INPUT_PULLUP);
+  pinMode(BUTTON_RIGHT, INPUT_PULLUP);
+  pinMode(BUTTON_DOWN, INPUT_PULLUP);
+  pinMode(BUTTON_ROTATE, INPUT_PULLUP);
+#endif
 
-  randomSeed(analogRead(A2));
+  unsigned int seed = 0;
+  EEPROM.get(0, seed);
+  randomSeed(seed);
+  seed = random(65535);
+  EEPROM.put(0, seed);
 
   shapeColors[SHAPE_I] = SHAPE_I_COLOR;
   shapeColors[SHAPE_J] = SHAPE_J_COLOR;
@@ -434,29 +462,20 @@ void setup() {
 
   for (byte i = 0; i < BOARD_WIDTH; i++) {
     for (byte j = 0; j < BOARD_HEIGHT; j++) {
-      fillBlock(i, j, COLOR_BLACK);
+      fillBlock(i, j, BACKGROUND_COLOR);
     }
   }
-
-  unsigned short txtYpos = (tft.height() / 2) - 30;
-  centerWrite("TETRIS", txtYpos, COLOR_RED);
-  centerWrite("THE SOVIET", txtYpos + 20, COLOR_WHITE);
-  centerWrite("MIND GAME", txtYpos + 30, COLOR_WHITE);
-  centerWrite("PUSH START", txtYpos + 70, COLOR_WHITE);
-  centerWrite("(c) 1989 Jonas Jensen", txtYpos + 100, COLOR_WHITE);
-
-  waitForClick();
-  tft.fillScreen(COLOR_BLACK);
-
-  tft.setCursor(SCORE_X, SCORE_Y);
-  tft.print("SCORE");
-  tft.setCursor(SCORE_X, SCORE_Y + 10);
-  tft.print("0");
-
-  drawGrid();
+  strip.show();
+  // TODO: Attach a button
+  //waitForClick();
+  currentShape = random(SHAPE_COUNT);
   nextShapeIndex = random(SHAPE_COUNT);
   nextShape();
+  Serial.print("First shape: ");
+  Serial.println(shapeNames[currentShape]);
   stamp = millis();
+
+  Serial.println("Setup end");
 }
 
 void loop() {

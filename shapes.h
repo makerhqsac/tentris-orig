@@ -1,7 +1,31 @@
 #ifndef shapes_h
 #define shapes_h
 
+#define swap(a, b) { COLOR t = a; a = b; b = t; }
+struct COLOR {
+  byte R;
+  byte G;
+  byte B;
+};
+bool operator==(const COLOR& lhs, const COLOR& rhs)
+{
+    return lhs.R == rhs.R && lhs.G == rhs.G && lhs.B == rhs.B;
+}
+bool operator!=(const COLOR& lhs, const COLOR& rhs)
+{
+    return !(lhs.R == rhs.R && lhs.G == rhs.G && lhs.B == rhs.B);
+}
+
 byte shapeRotations[] = { 2, 4, 4, 1, 2, 4, 2 };
+const char shapeNames[SHAPE_COUNT] = {
+  'I',
+  'J',
+  'L',
+  'O',
+  'S',
+  'T',
+  'Z'
+};
 const byte shapes[SHAPE_COUNT][4][4] = {
   { // SHAPE_I
     {

@@ -1,29 +1,30 @@
 #ifndef config_h
 #define config_h
 
-// TFT display and SD card will share the hardware SPI interface.
-// Hardware SPI pins are specific to the Arduino board type and
-// cannot be remapped to alternate pins.  For Arduino Uno,
-// Duemilanove, etc., pin 11 = MOSI, pin 12 = MISO, pin 13 = SCK.
-// #define SD_CS    4  // Chip select line for SD card
-#define TFT_CS            10  // Chip select line for TFT display
-#define TFT_DC            9   // Data/command line for TFT
-#define TFT_RST           8   // Reset line for TFT (or connect to +5V)
+
 #define SD_CS             4
 
+#define NEO_PIN           6
+
+#undef USE_ANALOG_JOY
+
+#ifdef USE_ANALOG_JOY
 #define JOY_X             A0
 #define JOY_Y             A1
 #define JOY_BTN           2
+#else
+#define BUTTON_LEFT       1
+#define BUTTON_RIGHT      2
+#define BUTTON_DOWN       3
+#define BUTTON_ROTATE     4
+#endif
 
 #define BUZZER            7
 
-#define BOARD_COLOR       COLOR_GRAY
-#define BACKGROUND_COLOR  COLOR_BLACK
+#define BACKGROUND_COLOR  COLOR_GRAY
 
 #define BOARD_WIDTH       10
 #define BOARD_HEIGHT      20
-#define BOARD_OFFSET_X    2
-#define BOARD_OFFSET_Y    17
 
 #define GAMEOVER_X        90
 #define GAMEOVER_Y        20
@@ -33,7 +34,6 @@
 #define LINE_SCORE_VALUE  100
 
 #define MIN(X, Y)         (((X) < (Y)) ? (X) : (Y))
-#define BLOCK_SIZE        MIN((tft.width() - 1) / BOARD_WIDTH, (tft.height() - 1) / BOARD_HEIGHT)
 
 #define SHAPE_COUNT       7
 
@@ -45,16 +45,27 @@
 #define SHAPE_T           5
 #define SHAPE_Z           6
 
-#define COLOR_GRAY        tft.Color565(33, 33, 33)
-#define COLOR_WHITE       ST7735_WHITE
-#define COLOR_BLACK       ST7735_BLACK
-#define COLOR_CYAN        ST7735_CYAN
-#define COLOR_YELLOW      ST7735_YELLOW
-#define COLOR_BLUE        ST7735_BLUE
-#define COLOR_ORANGE      tft.Color565(255, 165, 0)
-#define COLOR_LIME        tft.Color565(204, 255, 0)
-#define COLOR_PURPLE      tft.Color565(128,0,128)
-#define COLOR_RED         ST7735_RED
+#define COLOR_GRAY        COLOR {2, 2, 2}
+#define COLOR_WHITE       COLOR {5,5,5}
+#define COLOR_BLACK       COLOR {0,0,0}
+#define COLOR_CYAN        COLOR {0,5,5}
+#define COLOR_YELLOW      COLOR {5,5,0}
+#define COLOR_BLUE        COLOR {0,0,5}
+#define COLOR_ORANGE      COLOR {5,3,0}
+#define COLOR_LIME        COLOR {0,5,0}
+#define COLOR_PURPLE      COLOR {5,0,5}
+#define COLOR_RED         COLOR {5,0,0}
+
+//#define COLOR_GRAY        COLOR {33, 33, 33}
+//#define COLOR_WHITE       COLOR {255,255,255}
+//#define COLOR_BLACK       COLOR {0,0,0}
+//#define COLOR_CYAN        COLOR {0,255,255}
+//#define COLOR_YELLOW      COLOR {255,255,0}
+//#define COLOR_BLUE        COLOR {0,0,255}
+//#define COLOR_ORANGE      COLOR {255,165,0}
+//#define COLOR_LIME        COLOR {0,255,0}
+//#define COLOR_PURPLE      COLOR {255,0,255}
+//#define COLOR_RED         COLOR {255,0,0}
 
 #define SHAPE_I_COLOR     COLOR_CYAN
 #define SHAPE_J_COLOR     COLOR_BLUE
