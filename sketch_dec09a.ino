@@ -23,6 +23,8 @@ unsigned short level = 300;
 unsigned int score = 0;
 unsigned long stamp = 0;
 unsigned long lastDown = 0;
+unsigned long lastRotate = 0;
+unsigned long lastButton[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 COLOR grid[BOARD_WIDTH][BOARD_HEIGHT];
 COLOR shapeColors[SHAPE_COUNT];
@@ -36,7 +38,6 @@ bool hittingBottom() {
     }
   }
 }
-
 void drawNextShape() {
   Serial.print("Next shape: ");
   Serial.println(shapeNames[nextShapeIndex]);
@@ -53,7 +54,7 @@ void drawNextShape() {
 
 void nextShape() {
   yOffset = -4;
-  xOffset = 0;
+  xOffset = BOARD_WIDTH/2-2;
   currentRotation = 0;
   currentShape = nextShapeIndex;
   nextShapeIndex = random(SHAPE_COUNT);
@@ -62,7 +63,7 @@ void nextShape() {
 
 void waitForClick() {
 
-#ifdef JOY_BTN
+#ifdef USE_ANALOG_JOY
   while (true) {
     while (digitalRead(JOY_BTN) != LOW) {
       delay(100);
@@ -75,12 +76,7 @@ void waitForClick() {
   }
 #else
   while (true) {
-    while (digitalRead(BUTTON_ROTATE) != LOW) {
-      delay(100);
-    }
-
-    delay(50);
-    if (digitalRead(BUTTON_ROTATE) == LOW) {
+    if (debounceButton(BUTTON_ROTATE)) {
       return;
     }
   }
@@ -98,6 +94,7 @@ void saveScore() {
 void gameOver() {
   saveScore();
   Serial.println("Game over man! Game over!!");
+  printBoardToSerial();
   waitForClick();
 
   for (byte i = 0; i < BOARD_WIDTH; i++) {
@@ -113,7 +110,23 @@ void gameOver() {
 
 void fillBlock(byte x, byte y, COLOR color) {
   grid[x][y] = color;
+#ifdef TOPDOWN
+  strip.setPixelColor(BOARD_WIDTH * y + x, color.R, color.G, color.B);
+#else
   strip.setPixelColor(BOARD_WIDTH * (BOARD_HEIGHT - y - 1) + x, color.R, color.G, color.B);
+  /*if (x >= BOARD_WIDTH || x < 0) {
+    Serial.print("X exceeded width ");
+    Serial.print(x);
+    Serial.print(",");
+    Serial.println(y);
+  }
+  if (y >= BOARD_HEIGHT || y < 0) {
+    Serial.print("Y exceeded height ");
+    Serial.print(x);
+    Serial.print(",");
+    Serial.println(y);
+  }*/
+#endif
 }
 
 COLOR getCurrentShapeColor() {
@@ -166,6 +179,7 @@ bool isShapeColliding() {
           }
 
           Serial.println("Shape collided");
+          printBoardToSerial();
           return true;
         }
       }
@@ -361,31 +375,34 @@ void joystickMovement() {
     lastDown = now;
   }
 #else
-  // click
-  bool leftPressed = debounceButton(BUTTON_LEFT);
-  bool rightPressed = debounceButton(BUTTON_RIGHT);
-  bool downPressed = debounceButton(BUTTON_DOWN);
-  bool rotatePressed = debounceButton(BUTTON_ROTATE);
-
   // Handle buttons
   // TODO: Is this backward?? Copied from above
-  if ((now - lastMove) > MOVE_DELAY){
+  if ((lastMove - now) > MOVE_DELAY){
     // Left
+    bool leftPressed = debounceButton(BUTTON_LEFT);
     if (leftPressed && canMove(true)) {
       lastMove = now;
       xOffset--; 
     }
 
     // Right
+    bool rightPressed = debounceButton(BUTTON_RIGHT);
     if (rightPressed && canMove(false)) {
       lastMove = now;
       xOffset++; 
     }
   }
 
-  if (lastDown - now > DOWN_DELAY && downPressed) {
+  if (now - lastDown > DOWN_DELAY && debounceButton(BUTTON_DOWN)) {
     stamp -= level;
     lastDown = now;
+  }
+
+  bool rotatePressed = false;
+  if (now - lastRotate > DOWN_DELAY && debounceButton(BUTTON_ROTATE)) {
+    stamp -= level;
+    lastRotate = now;
+    rotatePressed = true;
   }
   
 #endif
@@ -399,13 +416,30 @@ void joystickMovement() {
 }
 
 bool debounceButton(int pin) {
-  bool isClicked = (digitalRead(pin) == LOW);
-  if (isClicked) {
-    delay(50);
-    isClicked = (digitalRead(pin) == LOW);
+  unsigned long now = millis();
+  if (digitalRead(pin) == LOW && abs(now - lastButton[pin]) > DEBOUNCE) {
+    lastButton[pin] = now;
+    Serial.print("Button: ");
+    Serial.println(pin);
+    return true;
+  } else {
+    return false;
   }
+}
 
-  return isClicked;
+void printBoardToSerial() {
+#ifdef DEBUG  
+  for (int y = 0; y < BOARD_HEIGHT; y++)  {
+    for (int x = 0; x < BOARD_WIDTH; x++)  {
+      if (grid[x][y] == BACKGROUND_COLOR) {
+        Serial.print(" ");
+      } else {
+        Serial.print("X");
+      }
+    }
+    Serial.println();
+  }
+#endif
 }
 
 void setup() {

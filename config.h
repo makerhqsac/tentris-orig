@@ -13,13 +13,13 @@
 #define JOY_Y             A1
 #define JOY_BTN           2
 #else
-#define BUTTON_LEFT       1
+#define BUTTON_LEFT       0
 #define BUTTON_RIGHT      2
 #define BUTTON_DOWN       3
 #define BUTTON_ROTATE     4
 #endif
 
-#define BUZZER            7
+#define BUZZER            9
 
 #define BACKGROUND_COLOR  COLOR_GRAY
 
@@ -45,6 +45,8 @@
 #define SHAPE_T           5
 #define SHAPE_Z           6
 
+#define DIM
+#ifdef DIM
 #define COLOR_GRAY        COLOR {2, 2, 2}
 #define COLOR_WHITE       COLOR {5,5,5}
 #define COLOR_BLACK       COLOR {0,0,0}
@@ -55,17 +57,18 @@
 #define COLOR_LIME        COLOR {0,5,0}
 #define COLOR_PURPLE      COLOR {5,0,5}
 #define COLOR_RED         COLOR {5,0,0}
-
-//#define COLOR_GRAY        COLOR {33, 33, 33}
-//#define COLOR_WHITE       COLOR {255,255,255}
-//#define COLOR_BLACK       COLOR {0,0,0}
-//#define COLOR_CYAN        COLOR {0,255,255}
-//#define COLOR_YELLOW      COLOR {255,255,0}
-//#define COLOR_BLUE        COLOR {0,0,255}
-//#define COLOR_ORANGE      COLOR {255,165,0}
-//#define COLOR_LIME        COLOR {0,255,0}
-//#define COLOR_PURPLE      COLOR {255,0,255}
-//#define COLOR_RED         COLOR {255,0,0}
+#else
+#define COLOR_GRAY        COLOR {33, 33, 33}
+#define COLOR_WHITE       COLOR {255,255,255}
+#define COLOR_BLACK       COLOR {0,0,0}
+#define COLOR_CYAN        COLOR {0,255,255}
+#define COLOR_YELLOW      COLOR {255,255,0}
+#define COLOR_BLUE        COLOR {0,0,255}
+#define COLOR_ORANGE      COLOR {255,165,0}
+#define COLOR_LIME        COLOR {0,255,0}
+#define COLOR_PURPLE      COLOR {255,0,255}
+#define COLOR_RED         COLOR {255,0,0}
+#endif
 
 #define SHAPE_I_COLOR     COLOR_CYAN
 #define SHAPE_J_COLOR     COLOR_BLUE
@@ -77,8 +80,9 @@
 
 #define FILE_NAME         "highscores.txt"
 
-#define MOVE_DELAY        50
+#define MOVE_DELAY        200
 #define DOWN_DELAY        150
+#define DEBOUNCE          50
 
 #define NEXTSHAPE_X       GAMEOVER_X
 #define NEXTSHAPE_Y       SCORE_Y + 50
