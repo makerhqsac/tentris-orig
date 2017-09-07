@@ -376,8 +376,7 @@ void joystickMovement() {
   }
 #else
   // Handle buttons
-  // TODO: Is this backward?? Copied from above
-  if ((lastMove - now) > MOVE_DELAY){
+  if ((now - lastMove) > MOVE_DELAY){
     // Left
     bool leftPressed = debounceButton(BUTTON_LEFT);
     if (leftPressed && canMove(true)) {
@@ -399,7 +398,7 @@ void joystickMovement() {
   }
 
   bool rotatePressed = false;
-  if (now - lastRotate > DOWN_DELAY && debounceButton(BUTTON_ROTATE)) {
+  if (now - lastRotate > ROTATE_DELAY && debounceButton(BUTTON_ROTATE)) {
     stamp -= level;
     lastRotate = now;
     rotatePressed = true;

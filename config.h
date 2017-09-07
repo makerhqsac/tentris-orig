@@ -82,6 +82,7 @@
 
 #define MOVE_DELAY        200
 #define DOWN_DELAY        150
+#define ROTATE_DELAY      150
 #define DEBOUNCE          50
 
 #define NEXTSHAPE_X       GAMEOVER_X
